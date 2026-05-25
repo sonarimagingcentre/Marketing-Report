@@ -31,6 +31,18 @@
     .delta-down {
       color: #dc2626;
     }
+
+    #startDate,
+    #endDate,
+    #monthFilter,
+    #specialityFilter,
+    #marketerFilter {
+      min-height: 34px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+    }
   </style>
   <style>
     .nav-links {
@@ -67,6 +79,11 @@
       <div>
         <h1>Doctor Referral Performance Dashboard</h1>
         <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <label>Month
+            <select id="monthFilter">
+              <option value="ALL">All months</option>
+            </select>
+          </label>
           <label>Start
             <input type="date" id="startDate" />
           </label>
@@ -678,6 +695,34 @@
       return { min, max };
     };
 
+    const initMonthFilter = (rows) => {
+      const monthSelect = document.getElementById('monthFilter');
+      if (!monthSelect) return;
+
+      const monthKeys = Array.from(new Set(rows.map(row => (row.date || '').slice(0, 7)).filter(Boolean))).sort();
+      monthKeys.forEach((monthKey) => {
+        const option = document.createElement('option');
+        option.value = monthKey;
+        const [year, month] = monthKey.split('-').map(Number);
+        option.textContent = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
+        monthSelect.appendChild(option);
+      });
+
+      monthSelect.addEventListener('change', () => {
+        const selectedMonth = monthSelect.value;
+        if (selectedMonth === 'ALL') return;
+
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const start = `${year}-${String(month).padStart(2, '0')}-01`;
+        const endDay = new Date(year, month, 0).getDate();
+        const end = `${year}-${String(month).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+
+        document.getElementById('startDate').value = start;
+        document.getElementById('endDate').value = end;
+        applyFilter();
+      });
+    };
+
     const state = {
       rows: [],
       filtered: [],
@@ -853,6 +898,16 @@
       updateModalityKpis(filtered, state.selectedMarketer);
       renderBottom(state.aggregates.high, state.aggregates.low, state.aggregates.totals);
       updateWeekOverWeek();
+      const monthSelect = document.getElementById('monthFilter');
+      if (monthSelect && displayStart && displayEnd) {
+        const startDate = new Date(displayStart);
+        const endDate = new Date(displayEnd);
+        const isWholeMonth = startDate.getDate() === 1
+          && startDate.getFullYear() === endDate.getFullYear()
+          && startDate.getMonth() === endDate.getMonth()
+          && endDate.getDate() === new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
+        monthSelect.value = isWholeMonth ? displayStart.slice(0, 7) : 'ALL';
+      }
       const spec = state.selectedSpeciality && state.selectedSpeciality !== 'ALL' ? ` | ${state.selectedSpeciality}` : '';
       const mk = state.selectedMarketer && state.selectedMarketer !== 'ALL' ? ` | ${state.selectedMarketer}` : '';
       document.getElementById('dateRangeLabel').textContent = `${displayStart} to ${displayEnd}${spec}${mk}`;
@@ -879,6 +934,7 @@
       state.sourceStart = sourceStart;
       state.sourceEnd = sourceEnd;
       initDateControls(state.rows);
+      initMonthFilter(state.rows);
       initSpecialityFilter();
       initMarketerFilter(state.rows);
       const agg = aggregate(state.rows);
@@ -1210,9 +1266,11 @@
 
       const startInputEl = document.getElementById('startDate');
       const endInputEl = document.getElementById('endDate');
+      const monthInputEl = document.getElementById('monthFilter');
       const applyButton = document.getElementById('applyDate');
       startInputEl.value = state.sourceStart;
       endInputEl.value = state.sourceEnd;
+      if (monthInputEl) monthInputEl.value = 'ALL';
       applyButton.addEventListener('click', applyFilter);
       applyFilter();
     });
