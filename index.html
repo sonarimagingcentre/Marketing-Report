@@ -13,21 +13,29 @@
       background: #f7f8fb;
     }
 
-    .frame {
-      width: 100vw;
-      height: 100vh;
-      border: 0;
-      display: block;
-      background: #f7f8fb;
+    .loading {
+      padding: 24px;
+      font-family: Segoe UI, Arial, sans-serif;
+      color: #1f2937;
     }
   </style>
 </head>
 <body>
-  <iframe
-    class="frame"
-    src="./github%20file/index-march-9-14.html"
-    title="Sonar Imaging Centre Marketing Report"
-    loading="eager"
-  ></iframe>
+  <div class="loading">Loading report…</div>
+  <script>
+    (async () => {
+      try {
+        const response = await fetch('./github%20file/index-march-9-14.html', { cache: 'no-cache' });
+        if (!response.ok) throw new Error('Dashboard HTML could not be loaded');
+        let html = await response.text();
+        html = html.replace('<head>', '<head><base href="./github%20file/">');
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (error) {
+        document.body.innerHTML = '<p class="loading">Unable to load the report. <a href="./github%20file/index-march-9-14.html">Open the dashboard directly</a>.</p>';
+      }
+    })();
+  </script>
 </body>
 </html>
