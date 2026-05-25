@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./style1.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-  <script src="./march_9_14_source.js?v=20260525-6"></script>
+  <script src="./march_9_14_source.js?v=20260525-7"></script>
   <script src="./doctor_specialities.js?v=20260316"></script>
   <script src="./doctor_marketers.js?v=20260316"></script>
   <style>
@@ -872,7 +872,7 @@
     const inlineData = { rows: [] };
     const loadData = async () => {
       try {
-        const resp = await fetch('./march_9_14_source.json', { cache: 'no-cache' });
+        const resp = await fetch('./march_9_14_source.json?v=20260525-7', { cache: 'no-cache' });
         if (resp.ok) return await resp.json();
       } catch (e) {
         // ignore, will fallback
