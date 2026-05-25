@@ -669,21 +669,10 @@
       startInput.max = max;
       endInput.min = min;
       endInput.max = max;
-      // Default to the most recent Mon–Sat week ending on the latest date in the data
-      const latestDate = max ? parseIsoDate(max) : null;
-      let defaultEnd = max || '';
-      let defaultStart = min || '';
-      if (latestDate) {
-        // Walk back to the most recent Saturday on or before latestDate
-        const endD = new Date(latestDate);
-        while (endD.getDay() !== 6) endD.setDate(endD.getDate() - 1);
-        // Monday of that same week
-        const startD = new Date(endD);
-        startD.setDate(endD.getDate() - 5);
-        const iso = d => { const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
-        defaultEnd = iso(endD) >= min && iso(endD) <= max ? iso(endD) : max;
-        defaultStart = iso(startD) >= min ? iso(startD) : min;
-      }
+      const preferredStart = '2026-05-11';
+      const preferredEnd = '2026-05-22';
+      const defaultStart = (min && max && preferredStart >= min && preferredStart <= max) ? preferredStart : (min || '');
+      const defaultEnd = (min && max && preferredEnd >= min && preferredEnd <= max) ? preferredEnd : (max || '');
       state.startDate = startInput.value = defaultStart;
       state.endDate = endInput.value = defaultEnd;
       return { min, max };
