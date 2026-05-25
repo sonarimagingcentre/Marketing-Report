@@ -1,0 +1,1223 @@
+﻿<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Doctor Referral Performance Dashboard</title>
+  <link rel="stylesheet" href="./style1.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <script src="./march_9_14_source.js?v=20260525-5"></script>
+  <script src="./doctor_specialities.js?v=20260316"></script>
+  <script src="./doctor_marketers.js?v=20260316"></script>
+  <style>
+    .kpi-delta {
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .kpi-meta {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #6b7280;
+      font-weight: 600;
+    }
+
+    .delta-up {
+      color: #16a34a;
+    }
+
+    .delta-down {
+      color: #dc2626;
+    }
+  </style>
+  <style>
+    .nav-links {
+      display: flex;
+      gap: 12px;
+    }
+
+    .nav-links a {
+      color: #fff;
+      text-decoration: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: #fff;
+    }
+
+    .nav-links a.active {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: #fff;
+    }
+
+  </style>
+</head>
+
+<body>
+  <header class="hero">
+    <div class="container hero-content">
+      <div>
+        <h1>Doctor Referral Performance Dashboard</h1>
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <label>Start
+            <input type="date" id="startDate" />
+          </label>
+          <label>End
+            <input type="date" id="endDate" />
+          </label>
+          <label>Speciality
+            <select id="specialityFilter">
+              <option value="ALL">All</option>
+            </select>
+          </label>
+          <label>Marketer
+            <select id="marketerFilter">
+              <option value="ALL">All</option>
+            </select>
+          </label>
+          <button id="applyDate"
+            style="padding:6px 12px;border:0;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;">Apply</button>
+          <span id="dateRangeLabel" style="color:#e5e7eb;"></span>
+        </div>
+      </div>
+      <img class="logo" src="Sonar Logo 1.1 (1).png" alt="Sonar logo" />
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="exec-summary">
+      <h2>Executive Summary</h2>
+      <div class="summary-card">
+        <div class="summary-grid">
+          <div>
+            <h4>Total Examinations</h4>
+            <p id="summaryTotalPatients">0</p>
+            <div class="kpi-delta" id="summaryTotalPatientsDelta"></div>
+          </div>
+          <div>
+            <h4>Total Referring Doctors</h4>
+            <p id="summaryDoctors">0</p>
+            <div class="kpi-delta" id="summaryDoctorsDelta"></div>
+          </div>
+          <div>
+            <h4>% Patients from &gt;5 Referrals</h4>
+            <p id="summaryPctHigh">0%</p>
+            <div class="kpi-delta" id="summaryPctHighDelta"></div>
+          </div>
+          <div>
+            <h4>% Doctors with &gt;5 Referrals</h4>
+            <p id="summaryPareto">0%</p>
+            <div class="kpi-delta" id="summaryParetoDelta"></div>
+          </div>
+        </div>
+        <p class="insight insight--summary" id="summaryInsight"></p>
+      </div>
+    </section>
+
+    <section class="kpi-section">
+      <h2>KPI Overview</h2>
+      <div class="kpis kpis--small">
+        <div class="kpi kpi--small">
+          <h3>Total MRI</h3>
+          <p id="kpiTotalMRI">0</p>
+          <div class="kpi-meta" id="kpiTotalMRIMeta">77 target | 0.0% achieved</div>
+          <div class="kpi-delta" id="kpiTotalMRIDelta"></div>
+        </div>
+        <div class="kpi kpi--small">
+          <h3>Total CT</h3>
+          <p id="kpiTotalCT">0</p>
+          <div class="kpi-meta" id="kpiTotalCTMeta">72 target | 0.0% achieved</div>
+          <div class="kpi-delta" id="kpiTotalCTDelta"></div>
+        </div>
+        <div class="kpi kpi--small">
+          <h3>Total XRay</h3>
+          <p id="kpiTotalXRay">0</p>
+          <div class="kpi-meta" id="kpiTotalXRayMeta">99 target | 0.0% achieved</div>
+          <div class="kpi-delta" id="kpiTotalXRayDelta"></div>
+        </div>
+        <div class="kpi kpi--small">
+          <h3>Total Ultrasound</h3>
+          <p id="kpiTotalUltrasound">0</p>
+          <div class="kpi-meta" id="kpiTotalUltrasoundMeta">83 target | 0.0% achieved</div>
+          <div class="kpi-delta" id="kpiTotalUltrasoundDelta"></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Doctors with More Than 5 Examinations</h2>
+      <div class="chart-wrap">
+        <canvas id="doctorChart" class="chart"></canvas>
+      </div>
+      <p class="insight">Insight: Referral activity is concentrated within a limited number of doctors, with this
+        group accounting for a significant share of total patient volume.</p>
+    </section>
+
+    <section>
+      <h2>Doctors with 5 or Fewer Examinations</h2>
+      <p class="insight">Insight: The majority of referring doctors contribute low referral volumes, indicating a
+        broad but shallow distribution of referral activity across the network.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Referring Doctor</th>
+              <th>Total Examinations</th>
+              <th>Share of Total (%)</th>
+              <th>MRI %</th>
+              <th>CT %</th>
+              <th>XRAY %</th>
+              <th>Ultrasound %</th>
+            </tr>
+          </thead>
+          <tbody id="lowTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">Generated for GitHub Pages</div>
+  </footer>
+
+  <script>
+    const formatNumber = (n) => Number(n || 0).toLocaleString();
+    const formatMarketer = (m) => (m && m.trim()) ? m.trim() : '';
+    const formatShare = (count, total) => {
+      const pct = total ? (count / total) * 100 : 0;
+      return `${pct.toFixed(1)}%`;
+    };
+
+    const cleanDisplayText = (text) => {
+      let out = (text || '').toString();
+      out = out.split('Ã¢â‚¬Â¦').join('...');
+      out = out.split('â€¦').join('...');
+      out = out.split('Ã¢â‚¬â„¢').join("'");
+      out = out.split('â€™').join("'");
+      out = out.split('Ã¢â‚¬Å“').join('"');
+      out = out.split('Ã¢â‚¬\u009d').join('"');
+      out = out.split('â€œ').join('"');
+      out = out.split('â€\u009d').join('"');
+      out = out.split('Ã¢â‚¬â€œ').join('-');
+      out = out.split('â€“').join('-');
+      out = out.split('Ã¢â‚¬â€\u009d').join('-');
+      out = out.split('â€”').join('-');
+      return out.trim();
+    };
+
+    const formatDoctorAxisLabel = (label) => {
+      const cleaned = cleanDisplayText(label);
+      const w = window.innerWidth || 1024;
+      const maxLen = w < 400 ? 12 : w < 480 ? 14 : w < 600 ? 18 : 30;
+      return cleaned.length > maxLen ? `${cleaned.slice(0, maxLen)}...` : cleaned;
+    };
+
+    const normalizeModality = (value) => {
+      const raw = (value || '').toString().trim().toUpperCase();
+      if (!raw) return '';
+      if (raw === 'MRI' || raw.includes('MRI')) return 'MRI';
+      if (raw === 'CT' || raw.includes('CT') || raw.includes('CAT')) return 'CT';
+      if (raw === 'XRAY' || raw === 'X-RAY' || raw.includes('X-RAY') || raw.includes('XRAY')) return 'XRAY';
+      if (raw === 'US' || raw === 'U/S' || raw.includes('ULTRASOUND')) return 'ULTRASOUND';
+      return '';
+    };
+
+    // Shared business rule for all current and future period dashboards.
+    const getScanCount = (modality, description) => {
+      const mod = normalizeModality(modality);
+      const desc = (description || '').toString().trim().toUpperCase();
+
+      if (mod === 'MRI') {
+        if (desc.includes('MOBIVIEW') && desc.includes('WHOLE SPINE')) {
+          return 1;
+        }
+        if (desc.includes('NECK') && desc.includes('POSTNASAL')) {
+          return 2;
+        }
+        if (desc.includes('THORACO-LUMBAR SPINE') || desc.includes('THORACO LUMBAR SPINE')) {
+          return 2;
+        }
+        if (desc.includes('WHOLE SPINE')) {
+          return 3;
+        }
+        if (desc.includes('ABDOMEN') && desc.includes('PELVIS')) {
+          return 2;
+        }
+        if (desc.includes('BRAIN') && desc.includes('TEMPORAL')) {
+          return 2;
+        }
+        if (desc.includes('BOTH') || desc.includes('BILATERAL')) {
+          return 2;
+        }
+        return 1;
+      }
+
+      if (mod === 'XRAY') {
+        return (desc.includes('BOTH') || desc.includes('BILATERAL')) ? 2 : 1;
+      }
+
+      if (mod === 'ULTRASOUND') {
+        if (desc.includes('ABDOMINO') || (desc.includes('ABDOMEN') && desc.includes('PELVIS'))) {
+          return 2;
+        }
+        if (desc.includes('DOPPLER') && desc.includes('BILATERAL')) {
+          return 2;
+        }
+        return 1;
+      }
+
+      if (mod === 'CT') {
+        if (desc.includes('CHEST') && desc.includes('ABDOMEN')) {
+          return 2;
+        }
+        return 1;
+      }
+
+      return 0;
+    };
+
+    const getModalityBreakdown = (rows) => {
+      const counts = { MRI: 0, CT: 0, XRAY: 0, ULTRASOUND: 0 };
+      (rows || []).forEach((row) => {
+        const mod = normalizeModality(row.modality);
+        if (!mod) return;
+        const units = Number(row.scanCount) || getScanCount(row.modality, row.itemServiceDescription);
+        counts[mod] += units;
+      });
+      return counts;
+    };
+
+    const getScanTotalsByMarketerAndModality = (rows) => {
+      const grouped = {};
+      (rows || []).forEach((row) => {
+        const mk = (row.marketer || '').toString().trim().toUpperCase() || 'UNASSIGNED';
+        const mod = normalizeModality(row.modality);
+        if (!mod) return;
+        const units = Number(row.scanCount) || getScanCount(row.modality, row.itemServiceDescription);
+        if (!grouped[mk]) grouped[mk] = { MRI: 0, CT: 0, XRAY: 0, ULTRASOUND: 0 };
+        grouped[mk][mod] += units;
+      });
+      return grouped;
+    };
+
+    const weeklyTargetsByMarketer = {
+      LYDIA: { MRI: 77, CT: 72, XRAY: 99, US: 83 },
+      STELLA: { MRI: 39, CT: 33, XRAY: 39, US: 28 },
+      GRACE: { MRI: 33, CT: 28, XRAY: 28, US: 28 }
+    };
+
+
+    const updateModalityKpis = (rows, selectedMarketer) => {
+      const counts = getModalityBreakdown(rows);
+      document.getElementById('kpiTotalMRI').textContent = formatNumber(counts.MRI);
+      document.getElementById('kpiTotalCT').textContent = formatNumber(counts.CT);
+      document.getElementById('kpiTotalXRay').textContent = formatNumber(counts.XRAY);
+      document.getElementById('kpiTotalUltrasound').textContent = formatNumber(counts.ULTRASOUND);
+
+      const getTargetsForSelection = (marketer) => {
+        if (!marketer || marketer === 'ALL') {
+          return Object.values(weeklyTargetsByMarketer).reduce((acc, t) => {
+            acc.MRI += t.MRI || 0;
+            acc.CT += t.CT || 0;
+            acc.XRAY += t.XRAY || 0;
+            acc.US += t.US || 0;
+            return acc;
+          }, { MRI: 0, CT: 0, XRAY: 0, US: 0 });
+        }
+        return weeklyTargetsByMarketer[marketer] || null;
+      };
+
+      const selectedTargets = getTargetsForSelection(selectedMarketer);
+
+      const setMeta = (elId, achieved, target) => {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        if (!target || target <= 0) {
+          el.textContent = '- target | - achieved';
+          return;
+        }
+        const pct = ((achieved / target) * 100).toFixed(1);
+        el.textContent = `${formatNumber(target)} target | ${pct}% achieved`;
+      };
+
+      setMeta('kpiTotalMRIMeta', counts.MRI, selectedTargets?.MRI || 0);
+      setMeta('kpiTotalCTMeta', counts.CT, selectedTargets?.CT || 0);
+      setMeta('kpiTotalXRayMeta', counts.XRAY, selectedTargets?.XRAY || 0);
+      setMeta('kpiTotalUltrasoundMeta', counts.ULTRASOUND, selectedTargets?.US || 0);
+    };
+
+    // normalize doctor names for consistent lookup
+    const normalizeDoctor = (name) => {
+      return (name || '').toString().trim().toUpperCase();
+    };
+
+    const getDoctorSpeciality = (name) => {
+      const norm = normalizeDoctor(name);
+      return (window.doctorSpecialities && window.doctorSpecialities[norm]) || 'UNKNOWN';
+    };
+
+    const filterBySpeciality = (rows, speciality) => {
+      if (!speciality || speciality === 'ALL') return rows;
+      const normSpec = speciality.toUpperCase();
+      return rows.filter(r => getDoctorSpeciality(r.doctor) === normSpec);
+    };
+
+    const filterByMarketer = (rows, marketer) => {
+      if (!marketer || marketer === 'ALL') return rows;
+      const normMk = marketer.toUpperCase().trim();
+      return rows.filter(r => (r.marketer || '').toString().toUpperCase().trim() === normMk);
+    };
+
+    const initSpecialityFilter = () => {
+      const sel = document.getElementById('specialityFilter');
+      if (!sel) return;
+      const specs = new Set(Object.values(window.doctorSpecialities || {}).map(s => (s || '').toUpperCase()));
+      specs.add('ALL');
+      const list = [...specs].sort();
+      sel.innerHTML = '';
+      list.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        sel.appendChild(opt);
+      });
+      sel.value = 'ALL';
+      sel.addEventListener('change', () => {
+        state.selectedSpeciality = sel.value;
+        applyFilter();
+      });
+    };
+
+    const initMarketerFilter = (rows) => {
+      const sel = document.getElementById('marketerFilter');
+      if (!sel) return;
+      const marketers = new Set((rows || []).map(r => (r.marketer || '').toString().toUpperCase().trim()).filter(Boolean));
+      marketers.add('ALL');
+      const list = [...marketers].sort();
+      sel.innerHTML = '';
+      list.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m === 'ALL' ? 'All' : m;
+        sel.appendChild(opt);
+      });
+      sel.value = 'ALL';
+      sel.addEventListener('change', () => {
+        state.selectedMarketer = sel.value;
+        applyFilter();
+      });
+    };
+    const modalityCols = ["mri", "ct", "xray", "ultrasound"];
+    const formatModalityCells = (mods, total) => {
+      const m = mods || {};
+      return modalityCols.map((key) => {
+        const pct = m[`${key}_pct`] ?? 0;
+        const cnt = m[`${key}_count`] ?? 0;
+        const pctText = Number.isFinite(pct) ? pct.toFixed(1) + '%' : '0.0%';
+        return `<td>${pctText} (${formatNumber(cnt)})</td>`;
+      }).join('');
+    };
+    const formatModalityCellsFromCounts = (counts, total) => {
+      return modalityCols.map((key) => {
+        const cnt = counts[key] || 0;
+        const pct = total ? (cnt / total) * 100 : 0;
+        return `<td>${pct.toFixed(1)}% (${formatNumber(cnt)})</td>`;
+      }).join('');
+    };
+    const sumModalities = (rows) => {
+      const sums = { mri: 0, ct: 0, xray: 0, ultrasound: 0 };
+      rows.forEach((r) => {
+        const mods = r.modalities || {};
+        modalityCols.forEach((key) => {
+          const c = mods[`${key}_count`] || 0;
+          sums[key] += c;
+        });
+      });
+      return sums;
+    };
+    const labelWithMarketer = (doctor, marketer) => {
+      const mk = formatMarketer(marketer);
+      return mk ? `${doctor} - ${mk}` : doctor;
+    };
+    const mainHospital = (name = '') => {
+      const cleaned = (name || '')
+        .replace(/[\u2013\u2014]/g, '-') // normalize en/em dash
+        .replace(/\s*-\s*/g, ' - ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const base = cleaned.split(' - ')[0].trim();
+      // Strip parenthetical suffixes like (KNH)
+      let canonical = base.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
+      // Remove trailing KNH tag variants
+      canonical = canonical.replace(/\s*KNH\s*$/i, '').trim() || canonical;
+      // Collapse repeated text (e.g., duplicated names)
+      const repeatMatch = canonical.match(/^(.+?)\1+$/);
+      canonical = (repeatMatch ? repeatMatch[1] : canonical).trim();
+      const upper = canonical.toUpperCase();
+      const anchors = [
+        'NAIROBI SPINE',
+        'KENYATTA NATIONAL HOSPITAL',
+        'AGA KHAN UNIVERSITY HOSPITAL',
+        'COPTIC HOSPITAL',
+        'THE NAIROBI HOSPITAL',
+        'EQUITY AFIA',
+        'MP SHAH HOSPITAL',
+        'MP SHA HOSPITAL',
+        'MIRAZI',
+        'KENYA AIRWAYS PRIDE CLINIC',
+        'KQ MEDICAL',
+        'KQ'
+      ];
+      for (const anchor of anchors) {
+        if (upper.includes(anchor)) return anchor;
+      }
+      return upper;
+    };
+
+    // ---------- new filtering helpers ----------
+    const aggregate = (rows) => {
+      const totals = {
+        patients: rows.length,
+        total_examinations: 0,
+        high_examinations: 0,
+        unique_patients: new Set(rows.map(r => r.patient || '')).size,
+        duplicate_patients: 0,
+        doctors_with_duplicates: 0,
+      };
+      totals.duplicate_patients = totals.patients - totals.unique_patients;
+
+      const byDoctor = new Map();
+      rows.forEach(r => {
+        const d = r.doctor || 'UNKNOWN';
+        const scanCount = Number(r.scanCount) || getScanCount(r.modality, r.itemServiceDescription);
+        totals.total_examinations += scanCount;
+        if (!byDoctor.has(d)) byDoctor.set(d, {
+          doctor: d,
+          patients: 0,
+          examinations: 0,
+          revenue: 0,
+          modalities: { MRI: 0, CT: 0, XRAY: 0, ULTRASOUND: 0, OTHER: 0 },
+          patientSet: new Set(),
+        });
+        const rec = byDoctor.get(d);
+        rec.patients += 1;
+        rec.examinations += scanCount;
+        rec.revenue += Number(r.revenue) || 0;
+        const modKey = normalizeModality(r.modality);
+        if (modKey) {
+          rec.modalities[modKey] = (rec.modalities[modKey] || 0) + scanCount;
+        } else {
+          rec.modalities.OTHER = (rec.modalities.OTHER || 0) + scanCount;
+        }
+        rec.patientSet.add(r.patient || '');
+      });
+
+      byDoctor.forEach(rec => {
+        const uniq = rec.patientSet.size;
+        if (uniq < rec.patients) totals.doctors_with_duplicates += 1;
+        modalityCols.forEach(m => {
+          // modalities stored under uppercase keys (MRI, CT, etc.)
+          const count = rec.modalities[m.toUpperCase()] || 0;
+          // create lowercase pct/count fields to match downstream formatting
+          rec.modalities[m + "_pct"] = Number(rec.examinations ? (count / rec.examinations * 100) : 0);
+          rec.modalities[m + "_count"] = count;
+        });
+      });
+
+      const all = Array.from(byDoctor.values());
+      const high = all.filter(r => r.examinations > 5).sort((a, b) => b.examinations - a.examinations);
+      const low = all.filter(r => r.examinations <= 5).sort((a, b) => b.examinations - a.examinations);
+      totals.high_examinations = high.reduce((s, r) => s + (r.examinations || 0), 0);
+
+      totals.high_patients = high.reduce((s, r) => s + r.patients, 0);
+      totals.doctors_high = high.length;
+      totals.doctors_low = low.length;
+      totals.duplicate_patients_pct = totals.patients ? (totals.duplicate_patients / totals.patients * 100) : 0;
+      totals.doctors_with_duplicates_pct = (totals.doctors_high + totals.doctors_low) ?
+        (totals.doctors_with_duplicates / (totals.doctors_high + totals.doctors_low) * 100) : 0;
+
+      return { high, low, totals };
+    };
+
+    // Period-over-period comparison:
+    // - full calendar month -> previous full month
+    // - 7-day range -> previous week
+    // - otherwise -> previous equal-length period
+    const updateWeekOverWeek = () => {
+      const parseIsoDate = (s) => {
+        const parts = (s || '').split('-').map(Number);
+        if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+      };
+      const iso = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+      const isCalendarMonthRange = (s, e) => {
+        const lastDay = new Date(s.getFullYear(), s.getMonth() + 1, 0).getDate();
+        return s.getDate() === 1 && s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth() && e.getDate() === lastDay;
+      };
+
+      const start = state.startDate ? parseIsoDate(state.startDate) : null;
+      const end = state.endDate ? parseIsoDate(state.endDate) : null;
+      let currRows, prevRows, label;
+      if (start && end) {
+        const dayCount = Math.floor((end - start) / 86400000) + 1;
+        let prevStart;
+        let prevEnd;
+
+        const isMonToSatWeek = dayCount === 6 && start.getDay() === 1 && end.getDay() === 6;
+
+        if (isCalendarMonthRange(start, end)) {
+          prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+          prevEnd = new Date(start.getFullYear(), start.getMonth(), 0);
+        } else if (dayCount === 7 || isMonToSatWeek) {
+          prevStart = new Date(start);
+          prevStart.setDate(prevStart.getDate() - 7);
+          prevEnd = new Date(end);
+          prevEnd.setDate(prevEnd.getDate() - 7);
+        } else {
+          prevStart = new Date(start);
+          prevStart.setDate(prevStart.getDate() - dayCount);
+          prevEnd = new Date(end);
+          prevEnd.setDate(prevEnd.getDate() - dayCount);
+        }
+
+        currRows = filterByDate(state.rows, iso(start), iso(end));
+        prevRows = filterByDate(state.rows, iso(prevStart), iso(prevEnd));
+        label = `${iso(prevStart)} – ${iso(prevEnd)}`;
+      } else {
+        currRows = filterByDate(state.rows, '2026-03-01', '2026-03-07');
+        prevRows = filterByDate(state.rows, '2026-02-01', '2026-02-07');
+        label = 'Feb Week 1';
+      }
+
+      // Keep comparison aligned to the currently selected filters.
+      currRows = filterBySpeciality(currRows, state.selectedSpeciality);
+      currRows = filterByMarketer(currRows, state.selectedMarketer);
+      prevRows = filterBySpeciality(prevRows, state.selectedSpeciality);
+      prevRows = filterByMarketer(prevRows, state.selectedMarketer);
+
+      const curr = aggregate(currRows).totals;
+      const prev = aggregate(prevRows).totals;
+      const currMods = getModalityBreakdown(currRows);
+      const prevMods = getModalityBreakdown(prevRows);
+
+      const totalDoctors = (t) => (t.doctors_high || 0) + (t.doctors_low || 0);
+      const totalExaminations = (t) => t.total_examinations ?? t.patients ?? 0;
+      const pctHighPatients = (t) => totalExaminations(t) ? ((t.high_examinations || t.high_patients || 0) / totalExaminations(t) * 100) : 0;
+      const pctHighDoctors = (t) => totalDoctors(t) ? (t.doctors_high / totalDoctors(t) * 100) : 0;
+
+      const metrics = [
+        { deltaId: 'kpiTotalMRIDelta', curr: currMods.MRI || 0, prev: prevMods.MRI || 0, isPct: false, label },
+        { deltaId: 'kpiTotalCTDelta', curr: currMods.CT || 0, prev: prevMods.CT || 0, isPct: false, label },
+        { deltaId: 'kpiTotalXRayDelta', curr: currMods.XRAY || 0, prev: prevMods.XRAY || 0, isPct: false, label },
+        { deltaId: 'kpiTotalUltrasoundDelta', curr: currMods.ULTRASOUND || 0, prev: prevMods.ULTRASOUND || 0, isPct: false, label },
+        { deltaId: 'summaryTotalPatientsDelta', curr: totalExaminations(curr), prev: totalExaminations(prev), isPct: false, label },
+        { deltaId: 'summaryDoctorsDelta', curr: totalDoctors(curr), prev: totalDoctors(prev), isPct: false, label },
+        { deltaId: 'summaryPctHighDelta', curr: pctHighPatients(curr), prev: pctHighPatients(prev), isPct: true, label },
+        { deltaId: 'summaryParetoDelta', curr: pctHighDoctors(curr), prev: pctHighDoctors(prev), isPct: true, label },
+      ];
+
+      const formatDelta = (curr, prev, isPct, label) => {
+        const diff = curr - prev;
+        if (!isFinite(diff)) return '';
+        if (Math.abs(diff) < (isPct ? 0.05 : 0.5)) return `<span>→ No change vs ${label}</span>`;
+        const up = diff > 0;
+        const arrow = up ? '↑' : '↓';
+        const cls = up ? 'delta-up' : 'delta-down';
+        const absMag = Math.abs(diff);
+        const mag = isPct ? `${absMag.toFixed(1)}%` : `${Math.round(absMag)}`;
+        return `<span class="${cls}">${arrow} ${mag} vs ${label}</span>`;
+      };
+
+      metrics.forEach(m => {
+        const el = document.getElementById(m.deltaId);
+        if (el) el.innerHTML = formatDelta(m.curr, m.prev, m.isPct, m.label);
+      });
+    };
+
+    const filterByDate = (rows, start, end) => {
+      const s = start ? new Date(start) : null;
+      const e = end ? new Date(end) : null;
+      return rows.filter(r => {
+        if (!r.date) return false;
+        const d = new Date(r.date);
+        if (s && d < s) return false;
+        if (e && d > e) return false;
+        return true;
+      });
+    };
+
+    const initDateControls = (rows) => {
+      const dates = rows.map(r => r.date).filter(Boolean).sort();
+      const min = dates[0];
+      const max = dates[dates.length - 1];
+      const startInput = document.getElementById('startDate');
+      const endInput = document.getElementById('endDate');
+      startInput.min = min;
+      startInput.max = max;
+      endInput.min = min;
+      endInput.max = max;
+      const preferredStart = '2026-05-11';
+      const preferredEnd = '2026-05-22';
+      const defaultStart = (min && max && preferredStart >= min && preferredStart <= max) ? preferredStart : (min || '');
+      const defaultEnd = (min && max && preferredEnd >= min && preferredEnd <= max) ? preferredEnd : (max || '');
+      state.startDate = startInput.value = defaultStart;
+      state.endDate = endInput.value = defaultEnd;
+      return { min, max };
+    };
+
+    const state = {
+      rows: [],
+      filtered: [],
+      aggregates: null,
+      chart: null,
+      totalPatients: 0,
+      selectedSpeciality: 'ALL',
+      selectedMarketer: 'ALL',
+      useSourceWindow: false,
+      sourceStart: null,
+      sourceEnd: null,
+      startDate: null,
+      endDate: null
+    };
+    let renderBottom; // will be assigned when data loads
+
+    const renderSummary = (totals) => {
+      const totalPatients = totals.patients || 0;
+      const totalExaminations = totals.total_examinations ?? totalPatients;
+      const highExaminations = totals.high_examinations ?? (totals.high_patients || 0);
+      const totalDoctors = (totals.doctors_high || 0) + (totals.doctors_low || 0);
+      const pctHigh = totalExaminations ? highExaminations / totalExaminations * 100 : 0;
+      const pctHighDoctors = totalDoctors ? (totals.doctors_high || 0) / totalDoctors * 100 : 0;
+      document.getElementById('summaryTotalPatients').textContent = formatNumber(totalExaminations);
+      document.getElementById('summaryDoctors').textContent = formatNumber(totalDoctors);
+      document.getElementById('summaryPctHigh').textContent = `${pctHigh.toFixed(1)}%`;
+      document.getElementById('summaryPareto').textContent = `${pctHighDoctors.toFixed(1)}%`;
+      document.getElementById('summaryInsight').textContent =
+        `${pctHighDoctors.toFixed(1)}% of referring doctors generated more than five referrals and contributed ${pctHigh.toFixed(1)}% of total patient volume.`;
+
+    };
+
+    const renderChart = (agg) => {
+      const labels = agg.high.map(r => r.doctor);
+      const values = agg.high.map(r => r.examinations);
+      const maxVal = Math.max(...values, 0);
+      // generous headroom so long-bar labels stay visible even for outlier values
+      const xMax = Math.ceil(maxVal * 2.5 + 20);
+      const canvas = document.getElementById('doctorChart');
+      const ctx = canvas.getContext('2d');
+      const chartWrap = canvas.closest('.chart-wrap');
+      chartWrap.style.height = (labels.length * 28) + 'px';
+      const total = agg.totals.total_examinations || agg.totals.patients || 1;
+
+      if (state.chart) state.chart.destroy();
+      state.chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Total Examinations',
+            data: values,
+            backgroundColor: '#2563eb',
+            barThickness: 14,
+            maxBarThickness: 14,
+            categoryPercentage: 1.0,
+            barPercentage: 1.0
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {
+            padding: {
+              left: window.innerWidth < 600 ? 4 : 8,
+              right: window.innerWidth < 600 ? 96 : 160
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            datalabels: {
+              anchor: 'end',
+              align: 'right',
+              offset: 8,
+              textAlign: 'left',
+              color: '#111827',
+              backgroundColor: 'rgba(255,255,255,0.9)',
+              borderColor: '#cbd5e1',
+              borderWidth: 1,
+              borderRadius: 4,
+              padding: 4,
+              font: { size: 11, weight: '700' },
+              formatter: function (value) { return value + ' (' + (value / total * 100).toFixed(1) + '%)'; },
+              clamp: false,
+              clip: false
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              max: xMax,
+              ticks: { display: false },
+              grid: { display: false }
+            },
+            y: {
+              ticks: {
+                color: '#0f172a',
+                font: {
+                  size: window.innerWidth < 480 ? 9 : window.innerWidth < 600 ? 10 : 12,
+                  weight: '600'
+                },
+                callback: function (value) {
+                  const raw = this.getLabelForValue(value);
+                  return formatDoctorAxisLabel(raw);
+                }
+              }
+            }
+          }
+        },
+        plugins: [ChartDataLabels]
+      });
+
+      // Bar click -> show breakdown
+      canvas.onclick = (evt) => {
+        const points = state.chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (!points.length) return;
+        const idx = points[0].index;
+        const doctor = labels[idx];
+        const docRows = state.filtered.filter(r => r.doctor === doctor);
+        const totalPatients = agg.totals.patients || 1;
+        const rowsHtml = docRows
+          .sort((a, b) => (a.patient || '').localeCompare(b.patient || ''))
+          .map(r => `
+            <tr>
+              <td>${r.patient || ''}</td>
+              <td>${r.modality || ''}</td>
+              <td>${r.date || ''}</td>
+            </tr>
+          `).join('');
+        const detail = document.getElementById('highDetail');
+        detail.innerHTML = `
+          <table>
+            <thead>
+              <tr><th>Patient</th><th>Modality</th><th>Posting Date</th></tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        `;
+        detail.style.display = '';
+      };
+    };
+
+    const renderLowTable = (agg) => {
+      const tbody = document.getElementById('lowTableBody');
+      tbody.innerHTML = '';
+      const totalPatients = agg.totals.total_examinations || agg.totals.patients || 1;
+      agg.low.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${cleanDisplayText(row.doctor)}</td>
+          <td>${formatNumber(row.examinations)}</td>
+          <td>${formatShare(row.examinations, totalPatients)}</td>
+          <td>${(row.modalities.mri_pct ?? 0).toFixed(1)}% (${formatNumber(row.modalities.mri_count ?? 0)})</td>
+          <td>${(row.modalities.ct_pct ?? 0).toFixed(1)}% (${formatNumber(row.modalities.ct_count ?? 0)})</td>
+          <td>${(row.modalities.xray_pct ?? 0).toFixed(1)}% (${formatNumber(row.modalities.xray_count ?? 0)})</td>
+          <td>${(row.modalities.ultrasound_pct ?? 0).toFixed(1)}% (${formatNumber(row.modalities.ultrasound_count ?? 0)})</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    };
+
+    const applyFilter = () => {
+      const displayStart = document.getElementById('startDate').value;
+      const displayEnd = document.getElementById('endDate').value;
+      state.startDate = displayStart;
+      state.endDate = displayEnd;
+      let filtered = filterByDate(state.rows, displayStart, displayEnd);
+      filtered = filterBySpeciality(filtered, state.selectedSpeciality);
+      filtered = filterByMarketer(filtered, state.selectedMarketer);
+      state.filtered = filtered;
+      state.aggregates = aggregate(filtered);
+      updateModalityKpis(filtered, state.selectedMarketer);
+      renderBottom(state.aggregates.high, state.aggregates.low, state.aggregates.totals);
+      updateWeekOverWeek();
+      const spec = state.selectedSpeciality && state.selectedSpeciality !== 'ALL' ? ` | ${state.selectedSpeciality}` : '';
+      const mk = state.selectedMarketer && state.selectedMarketer !== 'ALL' ? ` | ${state.selectedMarketer}` : '';
+      document.getElementById('dateRangeLabel').textContent = `${displayStart} to ${displayEnd}${spec}${mk}`;
+    };
+
+    const inlineData = { rows: [] };
+    const loadData = async () => {
+      try {
+        const resp = await fetch('./march_9_14_source.json', { cache: 'no-cache' });
+        if (resp.ok) return await resp.json();
+      } catch (e) {
+        // ignore, will fallback
+      }
+      // if fetching fails, use the embedded data (or empty if absent)
+      return window.doctorRevenueData || inlineData || { high: [], low: [], totals: {} };
+    };
+
+    loadData().then((data) => {
+      const allRows = data.rows || [];
+      const allDates = allRows.map(row => row.date).filter(Boolean).sort();
+      const sourceStart = allDates[0] || '';
+      const sourceEnd = allDates[allDates.length - 1] || '';
+      state.rows = filterByDate(allRows, sourceStart, sourceEnd);
+      state.sourceStart = sourceStart;
+      state.sourceEnd = sourceEnd;
+      initDateControls(state.rows);
+      initSpecialityFilter();
+      initMarketerFilter(state.rows);
+      const agg = aggregate(state.rows);
+      state.filtered = state.rows;
+      state.aggregates = agg;
+      renderBottom = (high, low, totals) => {
+
+        const totalPatients = totals.patients || 0;
+        const totalExaminations = totals.total_examinations ?? totalPatients;
+        const totalDoctors = (totals.doctors_high || 0) + (totals.doctors_low || 0);
+        const highExaminations = totals.high_examinations ?? (totals.high_patients || 0);
+        const pctHigh = totalExaminations ? (highExaminations / totalExaminations) * 100 : 0;
+        const pctHighDoctors = totalDoctors ? (totals.doctors_high || 0) / totalDoctors * 100 : 0;
+        // Summary
+        document.getElementById('summaryTotalPatients').textContent = formatNumber(totalExaminations);
+        document.getElementById('summaryDoctors').textContent = formatNumber(totalDoctors);
+        document.getElementById('summaryPctHigh').textContent = `${pctHigh.toFixed(1)}%`;
+        document.getElementById('summaryPareto').textContent = `${pctHighDoctors.toFixed(1)}%`;
+        document.getElementById('summaryInsight').textContent = `${pctHighDoctors.toFixed(1)}% of referring doctors generated more than five referrals and contributed ${pctHigh.toFixed(1)}% of total patient volume.`;
+
+        // Hospital grouping: compute totals across all doctors first, then split by threshold
+        const groupByHospital = rows => {
+          const acc = {};
+          rows.forEach(row => {
+            const key = mainHospital(row.doctor);
+            if (!acc[key]) acc[key] = { main: key, total: 0, rows: [] };
+            acc[key].total += row.examinations || 0;
+            acc[key].rows.push(row);
+          });
+          return acc;
+        };
+
+        const allGroups = groupByHospital(high.concat(low));
+        // high groups are those hospital aggregates exceeding 5 examinations
+        const highGroups = Object.values(allGroups)
+          .filter(g => (g.total || 0) > 5)
+          .sort((a, b) => (b.total || 0) - (a.total || 0));
+        const labelKeys = highGroups.map(g => g.main);
+        const labels = highGroups.map(g => cleanDisplayText(g.main));
+        const values = highGroups.map(g => g.total);
+        const canvas = document.getElementById('doctorChart');
+        const ctx = canvas.getContext('2d');
+        const chartWrap = canvas.closest('.chart-wrap');
+        chartWrap.style.height = (labels.length * 28) + 'px';
+        const breakdownHost = (() => {
+          let el = document.getElementById('highBreakdown');
+          if (!el) {
+            el = document.createElement('div');
+            el.id = 'highBreakdown';
+            el.className = 'high-breakdown-popup';
+            el.style.display = 'none';
+            document.body.appendChild(el);
+          }
+          return el;
+        })();
+
+        const closeBreakdown = () => {
+          breakdownHost.innerHTML = '';
+          breakdownHost.style.display = 'none';
+          breakdownHost.dataset.active = '';
+        };
+
+        closeBreakdown(); // Clear any previous breakdown popups before rendering
+
+        document.addEventListener('click', (evt) => {
+          if (!breakdownHost.dataset.active) return;
+          const withinPopup = breakdownHost.contains(evt.target);
+          if (!withinPopup) closeBreakdown();
+        });
+
+        document.addEventListener('keydown', (evt) => {
+          if (evt.key === 'Escape') closeBreakdown();
+        });
+
+        const renderHighBreakdown = (main, idx) => {
+          const group = allGroups[main];
+          if (!group) return;
+          const rows = group.rows
+            .slice()
+            .sort((a, b) => (b.examinations || 0) - (a.examinations || 0))
+            .map((r) => `
+                    <tr>
+                        <td>${cleanDisplayText(r.doctor)}</td>
+                  <td>${formatNumber(r.examinations)}</td>
+                  <td>${formatShare(r.examinations, totalExaminations)}</td>
+                        ${formatModalityCells(r.modalities, totalPatients)}
+                    </tr>`).join('');
+          const tableHtml = `
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Referring Doctor</th>
+                        <th>Total Examinations</th>
+                                    <th>Share of Total (%)</th>
+                                    <th>MRI %</th>
+                                    <th>CT %</th>
+                                    <th>XRAY %</th>
+                                    <th>Ultrasound %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows}
+                            </tbody>
+                        </table>
+                    </div>`;
+          breakdownHost.innerHTML = tableHtml;
+          breakdownHost.style.display = 'block';
+
+          const positionPopup = () => {
+            const padding = 12;
+            const gap = 8;
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const popupRect = breakdownHost.getBoundingClientRect();
+
+            let anchorRect;
+            // Try to anchor to the clicked bar
+            if (typeof idx === 'number' && highChart) {
+              const meta = highChart.getDatasetMeta(0);
+              const barEl = meta && meta.data && meta.data[idx];
+              if (barEl) {
+                const chart = highChart;
+                const canvasRect = chart.canvas.getBoundingClientRect();
+                anchorRect = {
+                  left: canvasRect.left + barEl.x - (barEl.width || 0) / 2,
+                  right: canvasRect.left + barEl.x + (barEl.width || 0) / 2,
+                  top: canvasRect.top + barEl.y - (barEl.height || 0) / 2,
+                  bottom: canvasRect.top + barEl.y + (barEl.height || 0) / 2,
+                  width: barEl.width || 0,
+                  height: barEl.height || 0,
+                };
+              }
+            }
+            // Fallback to section
+            if (!anchorRect) {
+              anchorRect = chartWrap.closest('section').getBoundingClientRect();
+            }
+
+            // Horizontally: center on the anchor, clamp to viewport
+            let left = anchorRect.left + (anchorRect.width / 2) - (popupRect.width / 2);
+            left = Math.max(padding, Math.min(left, vw - popupRect.width - padding));
+
+            // Vertically: prefer just below the bar
+            let top = anchorRect.bottom + gap;
+            // If that would be cut off, place above the bar
+            if (top + popupRect.height > vh - padding) {
+              top = anchorRect.top - popupRect.height - gap;
+            }
+            // Safety clamp
+            if (top < padding) top = padding;
+
+            breakdownHost.style.position = 'fixed';
+            breakdownHost.style.left = `${left}px`;
+            breakdownHost.style.top = `${top}px`;
+          };
+
+          positionPopup();
+          requestAnimationFrame(positionPopup);
+        };
+
+        if (state.chart) state.chart.destroy();
+        const highChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Total Examinations',
+              data: values,
+              backgroundColor: '#2563eb',
+              barThickness: 14,
+              maxBarThickness: 14,
+              categoryPercentage: 1.0,
+              barPercentage: 1.0
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+              padding: {
+                left: window.innerWidth < 600 ? 4 : 8,
+                right: window.innerWidth < 600 ? 96 : 160
+              }
+            },
+            onClick: (evt, elements) => {
+              // Stop propagation so the document click listener doesn't
+              // immediately close the popup we're about to open
+              if (evt.native) evt.native.stopPropagation();
+              if (!elements.length) return;
+              const idx = elements[0].index;
+              const main = labelKeys[idx];
+              if (breakdownHost.dataset.active === main) {
+                closeBreakdown();
+              } else {
+                renderHighBreakdown(main, idx);
+                breakdownHost.dataset.active = main;
+              }
+            },
+            plugins: {
+              legend: { display: false },
+              datalabels: {
+                anchor: 'end',
+                align: ctx => {
+                  // Always put Nairobi Spine label outside (right/end), others as before
+                  const label = ctx.chart.data.labels[ctx.dataIndex] || '';
+                  if (label.toUpperCase().includes('NAIROBI SPINE')) return 'end';
+                  const v = ctx.dataset.data[ctx.dataIndex];
+                  const max = Math.max(...ctx.dataset.data);
+                  return v > 0.8 * max ? 'start' : 'end';
+                },
+                color: ctx => {
+                  // Nairobi Spine: always dark blue outside; others as before
+                  const label = ctx.chart.data.labels[ctx.dataIndex] || '';
+                  if (label.toUpperCase().includes('NAIROBI SPINE')) return '#0f172a';
+                  const v = ctx.dataset.data[ctx.dataIndex];
+                  const max = Math.max(...ctx.dataset.data);
+                  return v > 0.8 * max ? '#fff' : '#0f172a';
+                },
+                clamp: false,
+                clip: false,
+                font: { size: 11, weight: '700' },
+                formatter: (value, ctx) => {
+                  // Show both count and percent, using only visible bars (filtered data)
+                  const data = ctx.dataset.data;
+                  const total = data.reduce((a, b) => a + b, 0);
+                  const pct = total ? (value / total) * 100 : 0;
+                  return `${value} (${pct.toFixed(1)}%)`;
+                }
+              }
+            },
+            scales: {
+              x: {
+                beginAtZero: true,
+                ticks: { color: '#111827', font: { size: 11 } },
+                grid: { color: 'rgba(0,0,0,0.05)' }
+              },
+              y: {
+                ticks: {
+                  color: '#0f172a',
+                  font: {
+                    size: window.innerWidth < 480 ? 9 : window.innerWidth < 600 ? 10 : 12,
+                    weight: '600'
+                  },
+                  callback: function (value) {
+                    const raw = this.getLabelForValue(value);
+                    return formatDoctorAxisLabel(raw);
+                  }
+                }
+              }
+            }
+          },
+          plugins: [ChartDataLabels]
+        });
+        state.chart = highChart;
+
+        // Low table with hospital grouping & expandable breakdown (those hospitals whose total â‰¤5)
+        const lowBody = document.getElementById('lowTableBody');
+        lowBody.innerHTML = '';
+
+        const lowGroups = Object.values(allGroups)
+          .filter(g => (g.total || 0) <= 5)
+          .sort((a, b) => (b.total || 0) - (a.total || 0));
+        const groups = lowGroups;
+
+        const buildBreakdownTable = (rows) => {
+          const innerRows = rows
+            .sort((a, b) => (b.examinations || 0) - (a.examinations || 0))
+            .map((r) => `
+                        <tr>
+                            <td>${cleanDisplayText(r.doctor)}</td>
+                            <td>${formatNumber(r.examinations)}</td>
+                            <td>${formatShare(r.examinations, totalExaminations)}</td>
+                            ${formatModalityCells(r.modalities, totalPatients)}
+                        </tr>
+                    `)
+            .join('');
+          return `
+                    <table class="nested-table" style="width:100%; border-collapse:collapse; margin-top:8px;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left; padding:6px 8px;">Referring Doctor</th>
+                              <th style="text-align:left; padding:6px 8px;">Total Examinations</th>
+                                <th style="text-align:left; padding:6px 8px;">Share of Total (%)</th>
+                                <th style="text-align:left; padding:6px 8px;">MRI %</th>
+                                <th style="text-align:left; padding:6px 8px;">CT %</th>
+                                <th style="text-align:left; padding:6px 8px;">XRAY %</th>
+                                <th style="text-align:left; padding:6px 8px;">Ultrasound %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${innerRows}
+                        </tbody>
+                    </table>
+                `;
+        };
+
+        groups.forEach((group) => {
+          const modCounts = sumModalities(group.rows);
+          const tr = document.createElement('tr');
+          tr.classList.add('group-row');
+          tr.dataset.group = group.main;
+          tr.innerHTML = `
+                <td><button type="button" class="linklike" aria-expanded="false" style="background:none;border:none;padding:0;color:inherit;cursor:pointer;text-align:left;width:100%">${cleanDisplayText(group.main)}</button></td>
+                    <td>${formatNumber(group.total)}</td>
+                <td>${formatShare(group.total, totalExaminations)}</td>
+                    ${formatModalityCellsFromCounts(modCounts, group.total)}
+                `;
+          lowBody.appendChild(tr);
+
+          const detail = document.createElement('tr');
+          detail.classList.add('group-detail');
+          detail.dataset.group = group.main;
+          detail.style.display = 'none';
+          detail.innerHTML = `<td colspan="7">${buildBreakdownTable(group.rows)}</td>`;
+          lowBody.appendChild(detail);
+
+          const toggle = tr.querySelector('button');
+          toggle.addEventListener('click', () => {
+            const isOpen = detail.style.display === '';
+            detail.style.display = isOpen ? 'none' : '';
+            detail.classList.toggle('highlight', !isOpen);
+            toggle.setAttribute('aria-expanded', String(!isOpen));
+          });
+        });
+      };
+      renderBottom(state.aggregates.high, state.aggregates.low, state.aggregates.totals);
+
+      const startInputEl = document.getElementById('startDate');
+      const endInputEl = document.getElementById('endDate');
+      const applyButton = document.getElementById('applyDate');
+      startInputEl.value = state.sourceStart;
+      endInputEl.value = state.sourceEnd;
+      applyButton.addEventListener('click', applyFilter);
+      applyFilter();
+    });
+  </script>
+</body>
+
+</html>
+
