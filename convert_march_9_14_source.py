@@ -34,6 +34,15 @@ def clean_text(value: object) -> str:
     return str(value).strip()
 
 
+# Permanent marketer overrides keyed by normalised doctor name (uppercase, stripped).
+# Use this when the Excel source has an incorrect or blank marketer for a known doctor.
+MARKETER_OVERRIDES: dict[str, str] = {
+    # Dr. Melong Taleng is under Prof. Oyoo Omondi → LYDIA
+    "DR MELONG TALENG": "LYDIA",
+    "DR. MELONG TALENG": "LYDIA",
+}
+
+
 def get_scan_count(modality: str, item_service: str) -> int:
     desc = item_service.upper()
 
@@ -88,10 +97,14 @@ def main() -> None:
         item_service = clean_text(r.get("Item/Service Description"))
         modality = norm_mod(r.get("Modalities"))
         marketer = clean_text(r.get("Marketer"))
+        doctor_name = clean_text(r.get("Referring Doctor"))
+        # Apply permanent overrides (case-insensitive match on doctor name)
+        marketer = MARKETER_OVERRIDES.get(doctor_name.upper().strip(), marketer) or \
+                   MARKETER_OVERRIDES.get(doctor_name.strip(), marketer)
         count = get_scan_count(modality, item_service)
 
         row_data = {
-            "doctor": clean_text(r.get("Referring Doctor")),
+            "doctor": doctor_name,
             "marketer": marketer,
             "patient": clean_text(r.get("Patient Name")),
             "itemServiceDescription": item_service,
