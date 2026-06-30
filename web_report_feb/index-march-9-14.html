@@ -325,10 +325,10 @@
       return grouped;
     };
 
-    const weeklyTargetsByMarketer = {
-      LYDIA: { MRI: 77, CT: 72, XRAY: 99, US: 83 },
-      STELLA: { MRI: 39, CT: 33, XRAY: 39, US: 28 },
-      GRACE: { MRI: 33, CT: 28, XRAY: 28, US: 28 }
+    const dailyTargetsByMarketer = {
+      LYDIA: { MRI: 14, CT: 13, XRAY: 18, US: 15 },
+      STELLA: { MRI: 7, CT: 6, XRAY: 7, US: 5 },
+      GRACE: { MRI: 6, CT: 5, XRAY: 5, US: 5 }
     };
 
 
@@ -339,17 +339,36 @@
       document.getElementById('kpiTotalXRay').textContent = formatNumber(counts.XRAY);
       document.getElementById('kpiTotalUltrasound').textContent = formatNumber(counts.ULTRASOUND);
 
+      const getSelectedDayCount = () => {
+        const start = state.startDate ? new Date(state.startDate) : null;
+        const end = state.endDate ? new Date(state.endDate) : null;
+        if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 1;
+        const diffDays = Math.floor((end - start) / 86400000) + 1;
+        return diffDays > 0 ? diffDays : 1;
+      };
+
+      const selectedDays = getSelectedDayCount();
+
       const getTargetsForSelection = (marketer) => {
+        const scaleTargets = (targets) => ({
+          MRI: (targets.MRI || 0) * selectedDays,
+          CT: (targets.CT || 0) * selectedDays,
+          XRAY: (targets.XRAY || 0) * selectedDays,
+          US: (targets.US || 0) * selectedDays
+        });
+
         if (!marketer || marketer === 'ALL') {
-          return Object.values(weeklyTargetsByMarketer).reduce((acc, t) => {
+          const allDailyTargets = Object.values(dailyTargetsByMarketer).reduce((acc, t) => {
             acc.MRI += t.MRI || 0;
             acc.CT += t.CT || 0;
             acc.XRAY += t.XRAY || 0;
             acc.US += t.US || 0;
             return acc;
           }, { MRI: 0, CT: 0, XRAY: 0, US: 0 });
+          return scaleTargets(allDailyTargets);
         }
-        return weeklyTargetsByMarketer[marketer] || null;
+        const marketerDailyTargets = dailyTargetsByMarketer[marketer];
+        return marketerDailyTargets ? scaleTargets(marketerDailyTargets) : null;
       };
 
       const selectedTargets = getTargetsForSelection(selectedMarketer);
