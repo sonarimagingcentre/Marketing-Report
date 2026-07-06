@@ -348,13 +348,14 @@
       };
 
       const selectedDays = getSelectedDayCount();
+      const targetMultiplier = selectedDays >= 5 ? 5.5 : selectedDays;
 
       const getTargetsForSelection = (marketer) => {
         const scaleTargets = (targets) => ({
-          MRI: (targets.MRI || 0) * selectedDays,
-          CT: (targets.CT || 0) * selectedDays,
-          XRAY: (targets.XRAY || 0) * selectedDays,
-          US: (targets.US || 0) * selectedDays
+          MRI: (targets.MRI || 0) * targetMultiplier,
+          CT: (targets.CT || 0) * targetMultiplier,
+          XRAY: (targets.XRAY || 0) * targetMultiplier,
+          US: (targets.US || 0) * targetMultiplier
         });
 
         if (!marketer || marketer === 'ALL') {
