@@ -370,8 +370,9 @@
           el.textContent = '- target | - achieved';
           return;
         }
-        const pct = ((achieved / target) * 100).toFixed(1);
-        el.textContent = `${formatNumber(target)} target | ${pct}% achieved`;
+        const roundedTarget = Math.round(target);
+        const pct = roundedTarget > 0 ? ((achieved / roundedTarget) * 100).toFixed(1) : '0.0';
+        el.textContent = `${formatNumber(roundedTarget)} target | ${pct}% achieved`;
       };
 
       setMeta('kpiTotalMRIMeta', counts.MRI, selectedTargets?.MRI || 0);
