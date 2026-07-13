@@ -348,7 +348,13 @@
       };
 
       const selectedDays = getSelectedDayCount();
-      const targetMultiplier = selectedDays >= 5 ? 5.5 : selectedDays;
+      const startDate = state.startDate ? new Date(state.startDate) : null;
+      const endDate = state.endDate ? new Date(state.endDate) : null;
+      const isMonToSatRange = !!(startDate && endDate
+        && startDate.getDay() === 1
+        && endDate.getDay() === 6
+        && selectedDays === 6);
+      const targetMultiplier = isMonToSatRange ? 5.5 : selectedDays;
 
       const getTargetsForSelection = (marketer) => {
         const scaleTargets = (targets) => ({
