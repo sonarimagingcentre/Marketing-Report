@@ -47,6 +47,12 @@ def get_scan_count(modality: str, item_service: str) -> int:
     desc = item_service.upper()
 
     if modality == "XRAY":
+        if "WHOLE SPINE" in desc and "STITCH" in desc:
+            return 3
+        if "LOWER LIMB" in desc and "BOTH" in desc and "STITCH" in desc:
+            return 2
+        if "LOWER LIMB" in desc and ("UNILATERAL" in desc or "ONE SIDE" in desc) and "STITCH" in desc:
+            return 1
         if "BOTH" in desc or "BILATERAL" in desc:
             return 2
 
