@@ -34,6 +34,11 @@ def clean_text(value: object) -> str:
     return str(value).strip()
 
 
+def normalize_doctor_name(value: object) -> str:
+    name = clean_text(value)
+    return re.sub(r"^DR\.\s*", "DR ", name, flags=re.IGNORECASE)
+
+
 # Permanent marketer overrides keyed by normalised doctor name (uppercase, stripped).
 # Use this when the Excel source has an incorrect or blank marketer for a known doctor.
 MARKETER_OVERRIDES: dict[str, str] = {
@@ -103,7 +108,7 @@ def main() -> None:
         item_service = clean_text(r.get("Item/Service Description"))
         modality = norm_mod(r.get("Modalities"))
         marketer = clean_text(r.get("Marketer"))
-        doctor_name = clean_text(r.get("Referring Doctor"))
+        doctor_name = normalize_doctor_name(r.get("Referring Doctor"))
         # Apply permanent overrides (case-insensitive match on doctor name)
         marketer = MARKETER_OVERRIDES.get(doctor_name.upper().strip(), marketer) or \
                    MARKETER_OVERRIDES.get(doctor_name.strip(), marketer)
