@@ -11,6 +11,8 @@ OUT_FLAT_JSON = Path("web_report_feb/march_9_14_source.json")
 OUT_FLAT_JS = Path("web_report_feb/march_9_14_source.js")
 OUT_GH_JSON = Path("github file/march_9_14_source.json")
 OUT_GH_JS = Path("github file/march_9_14_source.js")
+OUT_ROOT_JSON = Path("march_9_14_source.json")
+OUT_ROOT_JS = Path("march_9_14_source.js")
 
 
 def norm_mod(value: object) -> str:
@@ -145,6 +147,10 @@ def main() -> None:
     OUT_GH_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_GH_JSON.write_text(json_text, encoding="utf-8")
     OUT_GH_JS.write_text(js_text, encoding="utf-8")
+
+    # Write root copies used by index.html
+    OUT_ROOT_JSON.write_text(json_text, encoding="utf-8")
+    OUT_ROOT_JS.write_text(js_text, encoding="utf-8")
 
     grace_rows = sum(1 for row in rows if row["marketer"].strip().upper() == "GRACE")
     print(

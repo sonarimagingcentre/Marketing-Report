@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./style1.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-  <script src="./march_9_14_source.js?v=20260921-2"></script>
+  <script src="./march_9_14_source.js?v=20261005-2"></script>
   <script src="./doctor_specialities.js?v=20260316"></script>
   <script src="./doctor_marketers.js?v=20260615-1"></script>
   <style>
@@ -30,6 +30,18 @@
 
     .delta-down {
       color: #dc2626;
+    }
+
+    #startDate,
+    #endDate,
+    #monthFilter,
+    #specialityFilter,
+    #marketerFilter {
+      min-height: 34px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
     }
   </style>
   <style>
@@ -67,6 +79,11 @@
       <div>
         <h1>Doctor Referral Performance Dashboard</h1>
         <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <label>Month
+            <select id="monthFilter">
+              <option value="ALL">All months</option>
+            </select>
+          </label>
           <label>Start
             <input type="date" id="startDate" />
           </label>
@@ -393,11 +410,57 @@
 
     // Normalize title punctuation so DR NAME and DR. NAME group together.
     const normalizeDoctor = (name) => {
-      return (name || '').toString().trim().toUpperCase().replace(/^DR\.\s*/, 'DR ');
+      return (name || '').toString().trim().toUpperCase().replace(/^DR\.\s*/, 'DR ').replace(/\s+/g, ' ');
+    };
+
+    // Merge doctor names that form an unambiguous prefix chain
+    // (e.g. "DR GENGA EUGENE KALMAN" -> "DR GENGA EUGENE"). A shorter name is
+    // only treated as the same person when it has exactly one maximal extension,
+    // so genuinely different doctors (e.g. "DR CHEGE GEOFREY" vs
+    // "DR CHEGE MWANGI") are never merged.
+    const buildDoctorCanonicalMap = (rows) => {
+      const names = [...new Set((rows || []).map(r => normalizeDoctor(r.doctor)).filter(Boolean))].sort();
+      const nameSet = new Set(names);
+      // In a sorted list, a name has no extensions iff the next name does not start with it.
+      const maximals = names.filter((n, i) => {
+        const next = names[i + 1];
+        return !(next && next.startsWith(n + ' '));
+      });
+      // Count, for each occurring name, how many maximal names extend it (incl. itself).
+      const maximalCount = new Map();
+      maximals.forEach(mx => {
+        const words = mx.split(' ');
+        for (let len = 1; len <= words.length; len++) {
+          const prefix = words.slice(0, len).join(' ');
+          if (nameSet.has(prefix)) maximalCount.set(prefix, (maximalCount.get(prefix) || 0) + 1);
+        }
+      });
+      const map = {};
+      names.forEach(name => {
+        const words = name.split(' ');
+        let canonical = name;
+        // shortest unambiguous prefix wins; skip bare "DR"
+        for (let len = 2; len <= words.length; len++) {
+          const prefix = words.slice(0, len).join(' ');
+          if (!nameSet.has(prefix)) continue;
+          if (maximalCount.get(prefix) === 1) {
+            canonical = prefix;
+            break;
+          }
+        }
+        map[name] = canonical;
+      });
+      return map;
+    };
+
+    const canonicalDoctor = (name) => {
+      const norm = normalizeDoctor(name);
+      const map = state.doctorCanonicalMap || {};
+      return map[norm] || norm;
     };
 
     const getDoctorSpeciality = (name) => {
-      const norm = normalizeDoctor(name);
+      const norm = canonicalDoctor(name);
       return (window.doctorSpecialities && window.doctorSpecialities[norm]) || 'UNKNOWN';
     };
 
@@ -533,7 +596,7 @@
 
       const byDoctor = new Map();
       rows.forEach(r => {
-        const d = normalizeDoctor(r.doctor) || 'UNKNOWN';
+        const d = canonicalDoctor(r.doctor) || 'UNKNOWN';
         const scanCount = Number(r.scanCount) || getScanCount(r.modality, r.itemServiceDescription);
         totals.total_examinations += scanCount;
         if (!byDoctor.has(d)) byDoctor.set(d, {
@@ -706,24 +769,41 @@
       startInput.max = max;
       endInput.min = min;
       endInput.max = max;
-      // Default to the most recent Mon–Sat week ending on the latest date in the data
-      const latestDate = max ? parseIsoDate(max) : null;
-      let defaultEnd = max || '';
-      let defaultStart = min || '';
-      if (latestDate) {
-        // Walk back to the most recent Saturday on or before latestDate
-        const endD = new Date(latestDate);
-        while (endD.getDay() !== 6) endD.setDate(endD.getDate() - 1);
-        // Monday of that same week
-        const startD = new Date(endD);
-        startD.setDate(endD.getDate() - 5);
-        const iso = d => { const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
-        defaultEnd = iso(endD) >= min && iso(endD) <= max ? iso(endD) : max;
-        defaultStart = iso(startD) >= min ? iso(startD) : min;
-      }
+      const preferredStart = '2026-06-01';
+      const preferredEnd = '2026-07-11';
+      const defaultStart = (min && max && preferredStart >= min && preferredStart <= max) ? preferredStart : (min || '');
+      const defaultEnd = (min && max && preferredEnd >= min && preferredEnd <= max) ? preferredEnd : (max || '');
       state.startDate = startInput.value = defaultStart;
       state.endDate = endInput.value = defaultEnd;
       return { min, max };
+    };
+
+    const initMonthFilter = (rows) => {
+      const monthSelect = document.getElementById('monthFilter');
+      if (!monthSelect) return;
+
+      const monthKeys = Array.from(new Set(rows.map(row => (row.date || '').slice(0, 7)).filter(Boolean))).sort();
+      monthKeys.forEach((monthKey) => {
+        const option = document.createElement('option');
+        option.value = monthKey;
+        const [year, month] = monthKey.split('-').map(Number);
+        option.textContent = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
+        monthSelect.appendChild(option);
+      });
+
+      monthSelect.addEventListener('change', () => {
+        const selectedMonth = monthSelect.value;
+        if (selectedMonth === 'ALL') return;
+
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const start = `${year}-${String(month).padStart(2, '0')}-01`;
+        const endDay = new Date(year, month, 0).getDate();
+        const end = `${year}-${String(month).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+
+        document.getElementById('startDate').value = start;
+        document.getElementById('endDate').value = end;
+        applyFilter();
+      });
     };
 
     const state = {
@@ -738,7 +818,8 @@
       sourceStart: null,
       sourceEnd: null,
       startDate: null,
-      endDate: null
+      endDate: null,
+      doctorCanonicalMap: {}
     };
     let renderBottom; // will be assigned when data loads
 
@@ -901,6 +982,16 @@
       updateModalityKpis(filtered, state.selectedMarketer);
       renderBottom(state.aggregates.high, state.aggregates.low, state.aggregates.totals);
       updateWeekOverWeek();
+      const monthSelect = document.getElementById('monthFilter');
+      if (monthSelect && displayStart && displayEnd) {
+        const startDate = new Date(displayStart);
+        const endDate = new Date(displayEnd);
+        const isWholeMonth = startDate.getDate() === 1
+          && startDate.getFullYear() === endDate.getFullYear()
+          && startDate.getMonth() === endDate.getMonth()
+          && endDate.getDate() === new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
+        monthSelect.value = isWholeMonth ? displayStart.slice(0, 7) : 'ALL';
+      }
       const spec = state.selectedSpeciality && state.selectedSpeciality !== 'ALL' ? ` | ${state.selectedSpeciality}` : '';
       const mk = state.selectedMarketer && state.selectedMarketer !== 'ALL' ? ` | ${state.selectedMarketer}` : '';
       document.getElementById('dateRangeLabel').textContent = `${displayStart} to ${displayEnd}${spec}${mk}`;
@@ -926,7 +1017,9 @@
       state.rows = filterByDate(allRows, sourceStart, sourceEnd);
       state.sourceStart = sourceStart;
       state.sourceEnd = sourceEnd;
+      state.doctorCanonicalMap = buildDoctorCanonicalMap(state.rows);
       initDateControls(state.rows);
+      initMonthFilter(state.rows);
       initSpecialityFilter();
       initMarketerFilter(state.rows);
       const agg = aggregate(state.rows);
@@ -1258,9 +1351,11 @@
 
       const startInputEl = document.getElementById('startDate');
       const endInputEl = document.getElementById('endDate');
+      const monthInputEl = document.getElementById('monthFilter');
       const applyButton = document.getElementById('applyDate');
       startInputEl.value = state.sourceStart;
       endInputEl.value = state.sourceEnd;
+      if (monthInputEl) monthInputEl.value = 'ALL';
       applyButton.addEventListener('click', applyFilter);
       applyFilter();
     });

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./style1.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-  <script src="./march_9_14_source.js?v=20260921-2"></script>
+  <script src="./march_9_14_source.js?v=20261005-2"></script>
   <script src="./doctor_specialities.js?v=20260316"></script>
   <script src="./doctor_marketers.js?v=20260615-1"></script>
   <style>
@@ -410,11 +410,57 @@
 
     // Normalize title punctuation so DR NAME and DR. NAME group together.
     const normalizeDoctor = (name) => {
-      return (name || '').toString().trim().toUpperCase().replace(/^DR\.\s*/, 'DR ');
+      return (name || '').toString().trim().toUpperCase().replace(/^DR\.\s*/, 'DR ').replace(/\s+/g, ' ');
+    };
+
+    // Merge doctor names that form an unambiguous prefix chain
+    // (e.g. "DR GENGA EUGENE KALMAN" -> "DR GENGA EUGENE"). A shorter name is
+    // only treated as the same person when it has exactly one maximal extension,
+    // so genuinely different doctors (e.g. "DR CHEGE GEOFREY" vs
+    // "DR CHEGE MWANGI") are never merged.
+    const buildDoctorCanonicalMap = (rows) => {
+      const names = [...new Set((rows || []).map(r => normalizeDoctor(r.doctor)).filter(Boolean))].sort();
+      const nameSet = new Set(names);
+      // In a sorted list, a name has no extensions iff the next name does not start with it.
+      const maximals = names.filter((n, i) => {
+        const next = names[i + 1];
+        return !(next && next.startsWith(n + ' '));
+      });
+      // Count, for each occurring name, how many maximal names extend it (incl. itself).
+      const maximalCount = new Map();
+      maximals.forEach(mx => {
+        const words = mx.split(' ');
+        for (let len = 1; len <= words.length; len++) {
+          const prefix = words.slice(0, len).join(' ');
+          if (nameSet.has(prefix)) maximalCount.set(prefix, (maximalCount.get(prefix) || 0) + 1);
+        }
+      });
+      const map = {};
+      names.forEach(name => {
+        const words = name.split(' ');
+        let canonical = name;
+        // shortest unambiguous prefix wins; skip bare "DR"
+        for (let len = 2; len <= words.length; len++) {
+          const prefix = words.slice(0, len).join(' ');
+          if (!nameSet.has(prefix)) continue;
+          if (maximalCount.get(prefix) === 1) {
+            canonical = prefix;
+            break;
+          }
+        }
+        map[name] = canonical;
+      });
+      return map;
+    };
+
+    const canonicalDoctor = (name) => {
+      const norm = normalizeDoctor(name);
+      const map = state.doctorCanonicalMap || {};
+      return map[norm] || norm;
     };
 
     const getDoctorSpeciality = (name) => {
-      const norm = normalizeDoctor(name);
+      const norm = canonicalDoctor(name);
       return (window.doctorSpecialities && window.doctorSpecialities[norm]) || 'UNKNOWN';
     };
 
@@ -550,7 +596,7 @@
 
       const byDoctor = new Map();
       rows.forEach(r => {
-        const d = normalizeDoctor(r.doctor) || 'UNKNOWN';
+        const d = canonicalDoctor(r.doctor) || 'UNKNOWN';
         const scanCount = Number(r.scanCount) || getScanCount(r.modality, r.itemServiceDescription);
         totals.total_examinations += scanCount;
         if (!byDoctor.has(d)) byDoctor.set(d, {
@@ -772,7 +818,8 @@
       sourceStart: null,
       sourceEnd: null,
       startDate: null,
-      endDate: null
+      endDate: null,
+      doctorCanonicalMap: {}
     };
     let renderBottom; // will be assigned when data loads
 
@@ -970,6 +1017,7 @@
       state.rows = filterByDate(allRows, sourceStart, sourceEnd);
       state.sourceStart = sourceStart;
       state.sourceEnd = sourceEnd;
+      state.doctorCanonicalMap = buildDoctorCanonicalMap(state.rows);
       initDateControls(state.rows);
       initMonthFilter(state.rows);
       initSpecialityFilter();
