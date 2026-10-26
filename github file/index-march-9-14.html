@@ -713,25 +713,96 @@
       const currMods = getModalityBreakdown(currRows);
       const prevMods = getModalityBreakdown(prevRows);
 
+      // Working-day-weighted targets for any date range (mirrors updateModalityKpis)
+      const parseLocalDate2 = (value) => {
+        const [y, m, d] = (value || '').split('-').map(Number);
+        if (!y || !m || !d) return null;
+        const dt = new Date(y, m - 1, d);
+        return Number.isNaN(dt.getTime()) ? null : dt;
+      };
+      const workingDayWeight = (sVal, eVal) => {
+        const start = parseLocalDate2(sVal);
+        const end = parseLocalDate2(eVal);
+        if (!start || !end || start > end) return 1;
+        let total = 0;
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          const day = cursor.getDay();
+          if (day >= 1 && day <= 5) total += 1;
+          else if (day === 6) total += 0.5;
+          cursor.setDate(cursor.getDate() + 1);
+        }
+        return total > 0 ? total : 1;
+      };
+      const targetsForRange = (sVal, eVal) => {
+        const mult = workingDayWeight(sVal, eVal);
+        const mk = state.selectedMarketer;
+        const scale = (t) => ({
+          MRI: (t.MRI || 0) * mult,
+          CT: (t.CT || 0) * mult,
+          XRAY: (t.XRAY || 0) * mult,
+          US: (t.US || 0) * mult
+        });
+        if (!mk || mk === 'ALL') {
+          const all = Object.values(dailyTargetsByMarketer).reduce((acc, t) => {
+            acc.MRI += t.MRI || 0; acc.CT += t.CT || 0; acc.XRAY += t.XRAY || 0; acc.US += t.US || 0;
+            return acc;
+          }, { MRI: 0, CT: 0, XRAY: 0, US: 0 });
+          return scale(all);
+        }
+        const t = dailyTargetsByMarketer[mk];
+        return t ? scale(t) : null;
+      };
+      const currTargets = targetsForRange(state.startDate, state.endDate);
+      const prevTargets = targetsForRange(
+        (() => { const p = label.split(' – ')[0]; return p; })(),
+        (() => { const p = label.split(' – ')[1]; return p; })()
+      );
+      const pctAchieved = (mods, targets, key) => {
+        const t = targets && targets[key];
+        return t > 0 ? (mods[key] || 0) / t * 100 : 0;
+      };
+
       const totalDoctors = (t) => (t.doctors_high || 0) + (t.doctors_low || 0);
       const totalExaminations = (t) => t.total_examinations ?? t.patients ?? 0;
       const pctHighPatients = (t) => totalExaminations(t) ? ((t.high_examinations || t.high_patients || 0) / totalExaminations(t) * 100) : 0;
       const pctHighDoctors = (t) => totalDoctors(t) ? (t.doctors_high / totalDoctors(t) * 100) : 0;
 
       const metrics = [
-        { deltaId: 'kpiTotalMRIDelta', curr: currMods.MRI || 0, prev: prevMods.MRI || 0, isPct: false, label },
-        { deltaId: 'kpiTotalCTDelta', curr: currMods.CT || 0, prev: prevMods.CT || 0, isPct: false, label },
-        { deltaId: 'kpiTotalXRayDelta', curr: currMods.XRAY || 0, prev: prevMods.XRAY || 0, isPct: false, label },
-        { deltaId: 'kpiTotalUltrasoundDelta', curr: currMods.ULTRASOUND || 0, prev: prevMods.ULTRASOUND || 0, isPct: false, label },
+        { deltaId: 'kpiTotalMRIDelta', curr: pctAchieved(currMods, currTargets, 'MRI'), prev: pctAchieved(prevMods, prevTargets, 'MRI'), isPct: true, label, isTarget: true, rawCurr: currMods.MRI || 0, rawPrev: prevMods.MRI || 0 },
+        { deltaId: 'kpiTotalCTDelta', curr: pctAchieved(currMods, currTargets, 'CT'), prev: pctAchieved(prevMods, prevTargets, 'CT'), isPct: true, label, isTarget: true, rawCurr: currMods.CT || 0, rawPrev: prevMods.CT || 0 },
+        { deltaId: 'kpiTotalXRayDelta', curr: pctAchieved(currMods, currTargets, 'XRAY'), prev: pctAchieved(prevMods, prevTargets, 'XRAY'), isPct: true, label, isTarget: true, rawCurr: currMods.XRAY || 0, rawPrev: prevMods.XRAY || 0 },
+        { deltaId: 'kpiTotalUltrasoundDelta', curr: pctAchieved(currMods, currTargets, 'US'), prev: pctAchieved(prevMods, prevTargets, 'US'), isPct: true, label, isTarget: true, rawCurr: currMods.ULTRASOUND || 0, rawPrev: prevMods.ULTRASOUND || 0 },
         { deltaId: 'summaryTotalPatientsDelta', curr: totalExaminations(curr), prev: totalExaminations(prev), isPct: false, label },
         { deltaId: 'summaryDoctorsDelta', curr: totalDoctors(curr), prev: totalDoctors(prev), isPct: false, label },
         { deltaId: 'summaryPctHighDelta', curr: pctHighPatients(curr), prev: pctHighPatients(prev), isPct: true, label },
         { deltaId: 'summaryParetoDelta', curr: pctHighDoctors(curr), prev: pctHighDoctors(prev), isPct: true, label },
       ];
 
-      const formatDelta = (curr, prev, isPct, label) => {
+      const formatDelta = (curr, prev, isPct, label, isTarget, rawCurr, rawPrev) => {
         const diff = curr - prev;
         if (!isFinite(diff)) return '';
+        if (isTarget) {
+          // Raw count delta, with % of target achieved appended in target color
+          const rawDiff = (rawCurr || 0) - (rawPrev || 0);
+          let rawHtml;
+          if (Math.abs(rawDiff) < 0.5) {
+            rawHtml = `<span>→ No change vs ${label}</span>`;
+          } else {
+            const up = rawDiff > 0;
+            const cls = up ? 'delta-up' : 'delta-down';
+            rawHtml = `<span class="${cls}">${up ? '↑' : '↓'} ${Math.round(Math.abs(rawDiff))} vs ${label}</span>`;
+          }
+          // Target-achieved part: green if % achieved improved, red if it fell
+          const pctDiff = diff;
+          let tgtHtml = '';
+          if (Math.abs(pctDiff) >= 0.05) {
+            const upT = pctDiff > 0;
+            const clsT = upT ? 'delta-up' : 'delta-down';
+            tgtHtml = ` <span class="${clsT}" style="opacity:0.85">(${upT ? '↑' : '↓'}${Math.abs(pctDiff).toFixed(1)}% of target)</span>`;
+          }
+          return rawHtml + tgtHtml;
+        }
         if (Math.abs(diff) < (isPct ? 0.05 : 0.5)) return `<span>→ No change vs ${label}</span>`;
         const up = diff > 0;
         const arrow = up ? '↑' : '↓';
@@ -743,7 +814,7 @@
 
       metrics.forEach(m => {
         const el = document.getElementById(m.deltaId);
-        if (el) el.innerHTML = formatDelta(m.curr, m.prev, m.isPct, m.label);
+        if (el) el.innerHTML = formatDelta(m.curr, m.prev, m.isPct, m.label, m.isTarget, m.rawCurr, m.rawPrev);
       });
     };
 
