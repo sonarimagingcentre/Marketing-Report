@@ -9,7 +9,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
   <script src="./march_9_14_source.js?v=20261102-1"></script>
-  <script src="./doctor_specialities.js?v=20260316"></script>
+  <script src="./doctor_specialities.js?v=20261102"></script>
   <script src="./doctor_marketers.js?v=20260615-1"></script>
   <style>
     .kpi-delta {
@@ -187,6 +187,7 @@
           <thead>
             <tr>
               <th>Referring Doctor</th>
+              <th>Speciality</th>
               <th>Total Examinations</th>
               <th>Share of Total (%)</th>
               <th>MRI %</th>
@@ -410,7 +411,7 @@
 
     // Normalize title punctuation so DR NAME and DR. NAME group together.
     const normalizeDoctor = (name) => {
-      return (name || '').toString().trim().toUpperCase().replace(/^DR\.\s*/, 'DR ').replace(/\s+/g, ' ');
+      return (name || '').toString().trim().toUpperCase().replace(/\./g, '').replace(/\s+/g, ' ');
     };
 
     // Merge doctor names that form an unambiguous prefix chain
@@ -459,9 +460,41 @@
       return map[norm] || norm;
     };
 
+    const doctorSpecialityByTokens = (() => {
+      const byTokens = {};
+      const ambiguous = new Set();
+      Object.entries(window.doctorSpecialities || {}).forEach(([name, speciality]) => {
+        const key = normalizeDoctor(name).split(' ').sort().join(' ');
+        if (Object.prototype.hasOwnProperty.call(byTokens, key) && byTokens[key] !== speciality) {
+          delete byTokens[key];
+          ambiguous.add(key);
+        } else if (!ambiguous.has(key)) {
+          byTokens[key] = speciality;
+        }
+      });
+      return byTokens;
+    })();
+
     const getDoctorSpeciality = (name) => {
       const norm = canonicalDoctor(name);
-      return (window.doctorSpecialities && window.doctorSpecialities[norm]) || 'UNKNOWN';
+      const specialities = window.doctorSpecialities || {};
+      if (specialities[norm]) return specialities[norm];
+
+      const candidates = [norm];
+      const separator = norm.lastIndexOf(' - ');
+      if (separator >= 0) candidates.push(norm.slice(separator + 3));
+      for (const candidate of candidates) {
+        const key = candidate.split(' ').sort().join(' ');
+        if (doctorSpecialityByTokens[key]) return doctorSpecialityByTokens[key];
+      }
+      return 'UNKNOWN';
+    };
+
+    const getGroupSpeciality = (rows) => {
+      const specialities = [...new Set(rows.map(row => getDoctorSpeciality(row.doctor))
+        .filter(speciality => speciality && speciality !== 'UNKNOWN' && speciality !== 'NAN'))];
+      if (!specialities.length) return 'UNKNOWN';
+      return specialities.length === 1 ? specialities[0] : 'MULTIPLE';
     };
 
     const filterBySpeciality = (rows, speciality) => {
@@ -1174,6 +1207,7 @@
             .map((r) => `
                     <tr>
                         <td>${cleanDisplayText(r.doctor)}</td>
+                      <td>${getDoctorSpeciality(r.doctor)}</td>
                   <td>${formatNumber(r.examinations)}</td>
                   <td>${formatShare(r.examinations, totalExaminations)}</td>
                         ${formatModalityCells(r.modalities, totalPatients)}
@@ -1184,6 +1218,7 @@
                             <thead>
                                 <tr>
                                     <th>Referring Doctor</th>
+                                  <th>Speciality</th>
                         <th>Total Examinations</th>
                                     <th>Share of Total (%)</th>
                                     <th>MRI %</th>
@@ -1363,6 +1398,7 @@
             .map((r) => `
                         <tr>
                             <td>${cleanDisplayText(r.doctor)}</td>
+                          <td>${getDoctorSpeciality(r.doctor)}</td>
                             <td>${formatNumber(r.examinations)}</td>
                             <td>${formatShare(r.examinations, totalExaminations)}</td>
                             ${formatModalityCells(r.modalities, totalPatients)}
@@ -1374,6 +1410,7 @@
                         <thead>
                             <tr>
                                 <th style="text-align:left; padding:6px 8px;">Referring Doctor</th>
+                                <th style="text-align:left; padding:6px 8px;">Speciality</th>
                               <th style="text-align:left; padding:6px 8px;">Total Examinations</th>
                                 <th style="text-align:left; padding:6px 8px;">Share of Total (%)</th>
                                 <th style="text-align:left; padding:6px 8px;">MRI %</th>
@@ -1396,6 +1433,7 @@
           tr.dataset.group = group.main;
           tr.innerHTML = `
                 <td><button type="button" class="linklike" aria-expanded="false" style="background:none;border:none;padding:0;color:inherit;cursor:pointer;text-align:left;width:100%">${cleanDisplayText(group.main)}</button></td>
+                <td>${getGroupSpeciality(group.rows)}</td>
                     <td>${formatNumber(group.total)}</td>
                 <td>${formatShare(group.total, totalExaminations)}</td>
                     ${formatModalityCellsFromCounts(modCounts, group.total)}
@@ -1406,7 +1444,7 @@
           detail.classList.add('group-detail');
           detail.dataset.group = group.main;
           detail.style.display = 'none';
-          detail.innerHTML = `<td colspan="7">${buildBreakdownTable(group.rows)}</td>`;
+          detail.innerHTML = `<td colspan="8">${buildBreakdownTable(group.rows)}</td>`;
           lowBody.appendChild(detail);
 
           const toggle = tr.querySelector('button');
