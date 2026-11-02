@@ -487,13 +487,13 @@
         const key = candidate.split(' ').sort().join(' ');
         if (doctorSpecialityByTokens[key]) return doctorSpecialityByTokens[key];
       }
-      return 'UNKNOWN';
+      return '';
     };
 
     const getGroupSpeciality = (rows) => {
       const specialities = [...new Set(rows.map(row => getDoctorSpeciality(row.doctor))
         .filter(speciality => speciality && speciality !== 'UNKNOWN' && speciality !== 'NAN'))];
-      if (!specialities.length) return 'UNKNOWN';
+      if (!specialities.length) return '';
       return specialities.length === 1 ? specialities[0] : 'MULTIPLE';
     };
 
