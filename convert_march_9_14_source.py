@@ -110,6 +110,8 @@ def main() -> None:
         item_service = clean_text(r.get("Item/Service Description"))
         modality = norm_mod(r.get("Modalities"))
         marketer = clean_text(r.get("Marketer"))
+        if marketer.strip().upper() == "LYDA":
+            marketer = "LYDIA"
         doctor_name = normalize_doctor_name(r.get("Referring Doctor"))
         # Apply permanent overrides (case-insensitive match on doctor name)
         marketer = MARKETER_OVERRIDES.get(doctor_name.upper().strip(), marketer) or \
