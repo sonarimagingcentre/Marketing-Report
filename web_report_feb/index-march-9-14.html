@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./style1.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-  <script src="./march_9_14_source.js?v=20261104-1"></script>
+  <script src="./march_9_14_source.js?v=20261109-1"></script>
   <script src="./doctor_specialities.js?v=20261102"></script>
   <script src="./doctor_marketers.js?v=20260615-1"></script>
   <style>
@@ -335,6 +335,68 @@
       GRACE: { MRI: 6, CT: 5, XRAY: 5, US: 5 }
     };
 
+    const novemberTargetsByMarketer = {
+      LYDIA: {
+        daily: { MRI: 15, CT: 15, XRAY: 18, US: 15 },
+        weekly: { MRI: 75, CT: 70, XRAY: 90, US: 75 }
+      },
+      STELLA: {
+        daily: { MRI: 8, CT: 7, XRAY: 8, US: 6 },
+        weekly: { MRI: 40, CT: 35, XRAY: 40, US: 30 }
+      },
+      GRACE: {
+        daily: { MRI: 8, CT: 6, XRAY: 6, US: 6 },
+        weekly: { MRI: 40, CT: 30, XRAY: 30, US: 30 }
+      }
+    };
+
+    const getTargetsForRange = (startValue, endValue, marketer) => {
+      const parseDate = (value) => {
+        const [year, month, day] = (value || '').split('-').map(Number);
+        if (!year || !month || !day) return null;
+        const date = new Date(year, month - 1, day);
+        return Number.isNaN(date.getTime()) ? null : date;
+      };
+      const start = parseDate(startValue);
+      const end = parseDate(endValue);
+      if (!start || !end || start > end) return null;
+
+      let workingDayWeight = 0;
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        const day = cursor.getDay();
+        if (day >= 1 && day <= 5) workingDayWeight += 1;
+        else if (day === 6) workingDayWeight += 0.5;
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      workingDayWeight = workingDayWeight || 1;
+
+      const isNovember = start.getFullYear() === 2026 && start.getMonth() === 10
+        && end.getFullYear() === 2026 && end.getMonth() === 10;
+      const dayCount = Math.floor((end - start) / 86400000) + 1;
+      const isFullWeek = dayCount === 6 && start.getDay() === 1 && end.getDay() === 6;
+      const useWeeklyTargets = isNovember && isFullWeek;
+      const selectedMarketers = !marketer || marketer === 'ALL'
+        ? Object.keys(dailyTargetsByMarketer)
+        : [marketer];
+      const totals = { MRI: 0, CT: 0, XRAY: 0, US: 0 };
+
+      for (const selected of selectedMarketers) {
+        const legacyDaily = dailyTargetsByMarketer[selected];
+        const november = novemberTargetsByMarketer[selected];
+        if (!legacyDaily) return null;
+        const targets = isNovember
+          ? (useWeeklyTargets ? november.weekly : november.daily)
+          : legacyDaily;
+        const multiplier = useWeeklyTargets ? 1 : workingDayWeight;
+        totals.MRI += (targets.MRI || 0) * multiplier;
+        totals.CT += (targets.CT || 0) * multiplier;
+        totals.XRAY += (targets.XRAY || 0) * multiplier;
+        totals.US += (targets.US || 0) * multiplier;
+      }
+      return totals;
+    };
+
 
     const updateModalityKpis = (rows, selectedMarketer) => {
       const counts = getModalityBreakdown(rows);
@@ -343,53 +405,7 @@
       document.getElementById('kpiTotalXRay').textContent = formatNumber(counts.XRAY);
       document.getElementById('kpiTotalUltrasound').textContent = formatNumber(counts.ULTRASOUND);
 
-      const parseLocalDate = (value) => {
-        const [y, m, d] = (value || '').split('-').map(Number);
-        if (!y || !m || !d) return null;
-        const dt = new Date(y, m - 1, d);
-        return Number.isNaN(dt.getTime()) ? null : dt;
-      };
-
-      const getWorkingDayWeight = () => {
-        const start = parseLocalDate(state.startDate);
-        const end = parseLocalDate(state.endDate);
-        if (!start || !end || start > end) return 1;
-        let total = 0;
-        const cursor = new Date(start);
-        while (cursor <= end) {
-          const day = cursor.getDay();
-          if (day >= 1 && day <= 5) total += 1;
-          else if (day === 6) total += 0.5;
-          cursor.setDate(cursor.getDate() + 1);
-        }
-        return total > 0 ? total : 1;
-      };
-
-      const targetMultiplier = getWorkingDayWeight();
-
-      const getTargetsForSelection = (marketer) => {
-        const scaleTargets = (targets) => ({
-          MRI: (targets.MRI || 0) * targetMultiplier,
-          CT: (targets.CT || 0) * targetMultiplier,
-          XRAY: (targets.XRAY || 0) * targetMultiplier,
-          US: (targets.US || 0) * targetMultiplier
-        });
-
-        if (!marketer || marketer === 'ALL') {
-          const allDailyTargets = Object.values(dailyTargetsByMarketer).reduce((acc, t) => {
-            acc.MRI += t.MRI || 0;
-            acc.CT += t.CT || 0;
-            acc.XRAY += t.XRAY || 0;
-            acc.US += t.US || 0;
-            return acc;
-          }, { MRI: 0, CT: 0, XRAY: 0, US: 0 });
-          return scaleTargets(allDailyTargets);
-        }
-        const marketerDailyTargets = dailyTargetsByMarketer[marketer];
-        return marketerDailyTargets ? scaleTargets(marketerDailyTargets) : null;
-      };
-
-      const selectedTargets = getTargetsForSelection(selectedMarketer);
+      const selectedTargets = getTargetsForRange(state.startDate, state.endDate, selectedMarketer);
 
       const setMeta = (elId, achieved, target) => {
         const el = document.getElementById(elId);
@@ -704,6 +720,7 @@
       const start = state.startDate ? parseIsoDate(state.startDate) : null;
       const end = state.endDate ? parseIsoDate(state.endDate) : null;
       let currRows, prevRows, label;
+      let currStartValue, currEndValue, prevStartValue, prevEndValue;
       if (start && end) {
         const dayCount = Math.floor((end - start) / 86400000) + 1;
         let prevStart;
@@ -728,10 +745,18 @@
 
         currRows = filterByDate(state.rows, iso(start), iso(end));
         prevRows = filterByDate(state.rows, iso(prevStart), iso(prevEnd));
+        currStartValue = iso(start);
+        currEndValue = iso(end);
+        prevStartValue = iso(prevStart);
+        prevEndValue = iso(prevEnd);
         label = `${iso(prevStart)} – ${iso(prevEnd)}`;
       } else {
         currRows = filterByDate(state.rows, '2026-03-01', '2026-03-07');
         prevRows = filterByDate(state.rows, '2026-02-01', '2026-02-07');
+        currStartValue = '2026-03-01';
+        currEndValue = '2026-03-07';
+        prevStartValue = '2026-02-01';
+        prevEndValue = '2026-02-07';
         label = 'Feb Week 1';
       }
 
@@ -746,51 +771,8 @@
       const currMods = getModalityBreakdown(currRows);
       const prevMods = getModalityBreakdown(prevRows);
 
-      // Working-day-weighted targets for any date range (mirrors updateModalityKpis)
-      const parseLocalDate2 = (value) => {
-        const [y, m, d] = (value || '').split('-').map(Number);
-        if (!y || !m || !d) return null;
-        const dt = new Date(y, m - 1, d);
-        return Number.isNaN(dt.getTime()) ? null : dt;
-      };
-      const workingDayWeight = (sVal, eVal) => {
-        const start = parseLocalDate2(sVal);
-        const end = parseLocalDate2(eVal);
-        if (!start || !end || start > end) return 1;
-        let total = 0;
-        const cursor = new Date(start);
-        while (cursor <= end) {
-          const day = cursor.getDay();
-          if (day >= 1 && day <= 5) total += 1;
-          else if (day === 6) total += 0.5;
-          cursor.setDate(cursor.getDate() + 1);
-        }
-        return total > 0 ? total : 1;
-      };
-      const targetsForRange = (sVal, eVal) => {
-        const mult = workingDayWeight(sVal, eVal);
-        const mk = state.selectedMarketer;
-        const scale = (t) => ({
-          MRI: (t.MRI || 0) * mult,
-          CT: (t.CT || 0) * mult,
-          XRAY: (t.XRAY || 0) * mult,
-          US: (t.US || 0) * mult
-        });
-        if (!mk || mk === 'ALL') {
-          const all = Object.values(dailyTargetsByMarketer).reduce((acc, t) => {
-            acc.MRI += t.MRI || 0; acc.CT += t.CT || 0; acc.XRAY += t.XRAY || 0; acc.US += t.US || 0;
-            return acc;
-          }, { MRI: 0, CT: 0, XRAY: 0, US: 0 });
-          return scale(all);
-        }
-        const t = dailyTargetsByMarketer[mk];
-        return t ? scale(t) : null;
-      };
-      const currTargets = targetsForRange(state.startDate, state.endDate);
-      const prevTargets = targetsForRange(
-        (() => { const p = label.split(' – ')[0]; return p; })(),
-        (() => { const p = label.split(' – ')[1]; return p; })()
-      );
+      const currTargets = getTargetsForRange(currStartValue, currEndValue, state.selectedMarketer);
+      const prevTargets = getTargetsForRange(prevStartValue, prevEndValue, state.selectedMarketer);
       const pctAchieved = (mods, targets, key) => {
         const t = targets && targets[key];
         return t > 0 ? (mods[key] || 0) / t * 100 : 0;
